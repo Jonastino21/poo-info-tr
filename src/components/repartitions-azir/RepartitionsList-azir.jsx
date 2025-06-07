@@ -7,10 +7,8 @@ import parse from 'date-fns/parse';
 import startOfWeek from 'date-fns/startOfWeek';
 import getDay from 'date-fns/getDay';
 import { fr } from 'date-fns/locale';
-
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
-
+import { PencilIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useEvents } from '../../contexts/EventsContext';
 
 const locales = { fr: fr };
@@ -22,9 +20,6 @@ const localizer = dateFnsLocalizer({
   locales,
 });
 
-/**
- * messages : traductions des libellés internes de react-big-calendar
- */
 const messages = {
   allDay: 'Toute la journée',
   date: 'Date',
@@ -40,13 +35,9 @@ const messages = {
   agenda: 'Agenda',
 };
 
-/**
- * CustomToolbar : barre d’outils en français
- */
 function CustomToolbar({ label, onNavigate, onView, view }) {
   return (
     <div className="flex items-center justify-between mb-4">
-      {/* Bloc navigation : Aujourd'hui, Précédent, Suivant */}
       <div className="flex space-x-2">
         <button
           className="bg-indigo-500 text-white px-3 py-1 rounded hover:bg-indigo-600"
@@ -67,11 +58,7 @@ function CustomToolbar({ label, onNavigate, onView, view }) {
           Suivant
         </button>
       </div>
-
-      {/* Étiquette de la période (ex. “juin 02 – 08”) */}
       <span className="font-semibold text-gray-800">{label}</span>
-
-      {/* Bloc vues : Semaine, Jour, Agenda */}
       <div className="flex space-x-2">
         <button
           className={`px-3 py-1 rounded ${
@@ -109,17 +96,13 @@ function CustomToolbar({ label, onNavigate, onView, view }) {
 }
 
 export default function RepartitionsListAzir() {
-  // 1️⃣ Récupération du contexte (événements + ressources + fonctions)
   const { events, ressources, deleteEvent } = useEvents();
-
-  // 2️⃣ Filtre par ressource
   const [filtreRessourceId, setFiltreRessourceId] = useState('Tous');
-
-  // 3️⃣ États pour gérer la date et la vue contrôlées du calendrier
   const [currentDate, setCurrentDate] = useState(new Date());
   const [currentView, setCurrentView] = useState('week');
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // 4️⃣ Filtrage des événements selon la ressource sélectionnée
   const eventsAffiches =
     filtreRessourceId === 'Tous'
       ? events
@@ -127,20 +110,32 @@ export default function RepartitionsListAzir() {
           (evt) => String(evt.ressourceId) === String(filtreRessourceId)
         );
 
-  // 5️⃣ Fonction de suppression simulée
   const handleDelete = (id) => {
     if (!window.confirm('Supprimer ce créneau ?')) return;
     deleteEvent(id);
+    setIsModalOpen(false);
+  };
+
+  const handleEventClick = (event) => {
+    setSelectedEvent(event);
+    setIsModalOpen(true);
+  };
+
+  const formatDate = (date) => {
+    return new Date(date).toLocaleString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   return (
     <div className="bg-white p-6 rounded-2xl shadow-lg">
-      {/* ─── Barre de filtres par ressource ─────────────────────────────── */}
+      {/* Filtre par ressource */}
       <div className="flex items-center mb-4 space-x-2">
-        <label
-          htmlFor="filtreRessource"
-          className="text-sm font-medium text-gray-700"
-        >
+        <label htmlFor="filtreRessource" className="text-sm font-medium text-gray-700">
           Filtrer par ressource :
         </label>
         <select
@@ -149,6 +144,7 @@ export default function RepartitionsListAzir() {
           onChange={(e) => setFiltreRessourceId(e.target.value)}
           className="border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
         >
+          <option value="Tous">Toutes les ressources</option>
           {ressources.map((r) => (
             <option key={r.id} value={r.id}>
               {r.libelle}
@@ -157,60 +153,105 @@ export default function RepartitionsListAzir() {
         </select>
       </div>
 
-      {/* ─── Calendrier React Big Calendar ──────────────────────────────── */}
+      {/* Calendrier */}
       <Calendar
         localizer={localizer}
         events={eventsAffiches}
         startAccessor="start"
         endAccessor="end"
         culture="fr"
-
-        /* Date et vue sous contrôle du parent */
         date={currentDate}
         view={currentView}
-        onNavigate={(date) => setCurrentDate(date)}
-        onView={(view) => setCurrentView(view)}
-
-        /* Activation de la toolbar personnalisée */
+        onNavigate={setCurrentDate}
+        onView={setCurrentView}
+        onSelectEvent={handleEventClick}
         toolbar={true}
         components={{
           toolbar: CustomToolbar,
           event: ({ event }) => (
-            <div className="flex items-center justify-between px-1 py-0.5">
-              <div>
-                <span className="font-medium">{event.title}</span>
-                <div className="text-xs text-gray-500">
-                  {event.ressourceLabel} – {event.groupe}
-                </div>
-              </div>
-              <div className="flex space-x-1">
-                <Link
-                  to={`/dashboard/repartitions/${event.id}/modifier`}
-                  className="text-yellow-500 hover:text-yellow-700"
-                >
-                  <PencilIcon className="h-4 w-4" />
-                </Link>
-                <button
-                  onClick={() => handleDelete(event.id)}
-                  className="text-red-500 hover:text-red-700"
-                >
-                  <TrashIcon className="h-4 w-4" />
-                </button>
+            <div className="px-1 py-0.5">
+              <div className="font-medium">{event.title}</div>
+              <div className="text-xs text-white-500">
+                {event.ressourceLabel} – {event.groupe || event.responsable}
               </div>
             </div>
           ),
         }}
-
-        /* Vues disponibles en français */
         views={['week', 'day', 'agenda']}
         defaultView="week"
-
-        /* Traduction des libellés internes */
         messages={messages}
-
-        /* Style de hauteur (pour occuper l’espace dans notre carte) */
         style={{ height: 600 }}
       />
+
+      {/* Modal d'affichage de l'événement */}
+      {isModalOpen && selectedEvent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-xl font-bold">{selectedEvent.title}</h3>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm text-gray-500">Description</p>
+                <p>{selectedEvent.description || 'Aucune description'}</p>
+              </div>
+              
+              <div>
+                <p className="text-sm text-gray-500">Ressource</p>
+                <p>{selectedEvent.ressourceLabel}</p>
+              </div>
+              
+              {selectedEvent.groupe && (
+                <div>
+                  <p className="text-sm text-gray-500">Groupe</p>
+                  <p>{selectedEvent.groupe}</p>
+                </div>
+              )}
+              
+              {selectedEvent.responsable && (
+                <div>
+                  <p className="text-sm text-gray-500">Responsable</p>
+                  <p>{selectedEvent.responsable}</p>
+                </div>
+              )}
+              
+              <div>
+                <p className="text-sm text-gray-500">Début</p>
+                <p>{formatDate(selectedEvent.start)}</p>
+              </div>
+              
+              <div>
+                <p className="text-sm text-gray-500">Fin</p>
+                <p>{formatDate(selectedEvent.end)}</p>
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-3 mt-6">
+              <Link
+                to={`/dashboard/repartitions/${selectedEvent.id}/modifier`}
+                className="flex items-center px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600"
+              >
+                <PencilIcon className="h-4 w-4 mr-2" />
+                Modifier
+              </Link>
+              <button
+                onClick={() => handleDelete(selectedEvent.id)}
+                className="flex items-center px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+              >
+                <TrashIcon className="h-4 w-4 mr-2" />
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

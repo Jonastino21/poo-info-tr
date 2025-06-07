@@ -1,58 +1,87 @@
 import React, { createContext, useState, useEffect } from 'react';
+import { api } from '../../config';
+import { useNavigate } from 'react-router-dom';
 
 export const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const savedToken = localStorage.getItem('AUTH_TOKEN');
-    const savedUser = localStorage.getItem('AUTH_USER');
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(savedUser);
-    }
+    const initializeAuth = async () => {
+      const savedUser = localStorage.getItem('AUTH_USER');
+
+      if (savedUser) {
+        try {
+          const userData = JSON.parse(savedUser);
+          
+          // Optionnel: Valider la session avec le backend
+          // await api.get('/api/auth/validate');
+          
+          setUser(userData);
+        } catch (error) {
+          logout();
+        }
+      }
+      setLoading(false);
+    };
+
+    initializeAuth();
   }, []);
 
   const login = async ({ email, password }) => {
-    // fake login
-    const VALID_EMAIL = 'admin@isstm.mg';
-    const VALID_PASSWORD = 'admin123';
+    try {
+      const response = await api.post('/api/auth/login', { email, password });
+      
+      // Stocker les infos utilisateur
+      localStorage.setItem('AUTH_USER', JSON.stringify(response.data));
+      
+      // Mettre à jour le state
+      setUser(response.data);
+      
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Échec de la connexion');
+    }
+  };
 
-    return new Promise((resolve, reject) => {
-      // Simuler un délai réseau (optionnel)
-      setTimeout(() => {
-        if (email === VALID_EMAIL && password === VALID_PASSWORD) {
-          // En cas de succès : on crée un token factice
-          const fakeToken = 'fake-jwt-token';
-
-          setToken(fakeToken);
-          setUser(email);
-          localStorage.setItem('AUTH_TOKEN', fakeToken);
-          localStorage.setItem('AUTH_USER', email);
-
-          resolve({
-            token: fakeToken,
-            user: { email }
-          });
-        } else {
-          reject(new Error('Email ou mot de passe invalide'));
-        }
-      }, 500);
-    });
+  const register = async ({ username, email, password, role }) => {
+    try {
+      const response = await api.post('/api/auth/register', { 
+        username, 
+        email, 
+        password, 
+        role 
+      });
+      
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || "Échec de l'inscription");
+    }
   };
 
   const logout = () => {
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem('AUTH_TOKEN');
     localStorage.removeItem('AUTH_USER');
+    setUser(null);
+    navigate('/login');
+  };
+
+  const value = {
+    user,
+    loading,
+    login,
+    register,
+    logout,
+    isAuthenticated: !!user,
+    isResponsable: user?.role === 'RESPONSABLE',
+    isStudent: user?.role === 'STUDENT'
   };
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout }}>
-      {children}
+    <AuthContext.Provider value={value}>
+      {!loading && children}
     </AuthContext.Provider>
   );
 };

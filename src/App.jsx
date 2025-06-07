@@ -14,15 +14,19 @@ import RepartitionsListAzir from './components/repartitions-azir/RepartitionsLis
 import RepartitionFormAzir from './components/repartitions-azir/repartitionForm-azir';
 
 import { EventsProvider } from './contexts/EventsContext';
+import ResourcesList from './components/repartitions-azir/ResourceList-azir';
+import GroupsList from './components/repartitions-azir/GroupeList-azir';
+import RegisterContainer from './pages/auth/RegisterContainer';
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+
+    <BrowserRouter>
+      <AuthProvider>
         <Routes>
           {/* 1) Route publique pour login */}
           <Route path="/login" element={<LoginContainer />} />
-
+          <Route path="/register" element={<RegisterContainer />} />
           {/* 2) Routes protégées */}
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />}>
@@ -35,6 +39,8 @@ function App() {
                    - Ainsi, RepartitionsList et RepartitionForm utilisent
                      le même contexte (mémoire partagée)
               */}
+              <Route path='ressources' element={<ResourcesList />} />
+              <Route path='groupes' element={<GroupsList />} />
               <Route
                 path="repartitions"
                 element={
@@ -51,6 +57,7 @@ function App() {
 
                 {/* /dashboard/repartitions/:id/modifier → édition */}
                 <Route path=":id/modifier" element={<RepartitionFormAzir />} />
+
               </Route>
 
               {/* Toute autre route sous /dashboard redirige sur /dashboard */}
@@ -61,8 +68,9 @@ function App() {
           {/* Si on tape / → on renvoie vers /login */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
+
   );
 }
 

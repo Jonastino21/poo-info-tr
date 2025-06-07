@@ -1,10 +1,14 @@
 import React from 'react';
 
-const LoginView = ({
+const RegisterView = ({
+  username,
+  setUsername,
   email,
   setEmail,
   password,
   setPassword,
+  role,
+  setRole,
   error,
   loading,
   onSubmit,
@@ -13,7 +17,7 @@ const LoginView = ({
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="w-full max-w-md bg-white rounded-lg shadow-md p-6">
         <h2 className="text-2xl font-semibold text-center mb-6">
-          Connexion
+          Créer un compte
         </h2>
 
         {error && (
@@ -24,6 +28,20 @@ const LoginView = ({
 
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
+            <label htmlFor="username" className="block mb-1 font-medium">
+              Nom d'utilisateur
+            </label>
+            <input
+              type="text"
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+              className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-300"
+            />
+          </div>
+
+          <div>
             <label htmlFor="email" className="block mb-1 font-medium">
               Adresse email
             </label>
@@ -33,7 +51,6 @@ const LoginView = ({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="exemple@isstm.mg"
               className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-300"
             />
           </div>
@@ -48,9 +65,26 @@ const LoginView = ({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              placeholder="••••••••"
+              minLength="6"
               className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-300"
             />
+          </div>
+
+          <div>
+            <label htmlFor="role" className="block mb-1 font-medium">
+              Rôle
+            </label>
+            <select
+              id="role"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              required
+              className="w-full border border-gray-300 px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              <option value="">Sélectionner un rôle</option>
+              <option value="STUDENT">Étudiant</option>
+              <option value="RESPONSABLE">Responsable</option>
+            </select>
           </div>
 
           <button
@@ -58,12 +92,13 @@ const LoginView = ({
             disabled={loading}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded transition duration-150 disabled:opacity-50"
           >
-            {loading ? 'Connexion…' : 'Se connecter'}
+            {loading ? 'Inscription en cours...' : 'S\'inscrire'}
           </button>
+
           <div className="text-center text-sm text-gray-600">
-            Pas de compte?{' '}
-            <a href="/register" className="text-blue-600 hover:underline">
-              S'inscrire
+            Déjà un compte?{' '}
+            <a href="/login" className="text-blue-600 hover:underline">
+              Se connecter
             </a>
           </div>
         </form>
@@ -72,4 +107,4 @@ const LoginView = ({
   );
 };
 
-export default LoginView;
+export default RegisterView;

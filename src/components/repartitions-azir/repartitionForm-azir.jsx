@@ -2,81 +2,162 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-
-// On récupère les hooks du contexte pour lire/mettre à jour le state global
-import { useEvents } from '../../contexts/EventsContext';
+import Select from 'react-select';
+import { api } from '../../../config';
 
 export default function RepartitionFormAzir() {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
 
-  // On récupère du contexte : 
-  // - events pour préremplir en mode édition 
-  // - ressources pour la liste déroulante 
-  // - addEvent / updateEvent pour sauvegarder
-  const { events, ressources, addEvent, updateEvent } = useEvents();
+  // États pour les données chargées
+  const [ressources, setRessources] = useState([]);
+  const [groupes, setGroupes] = useState([]);
+  const [responsables, setResponsables] = useState([]);
+  const [creneau, setCreneau] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // react-hook-form pour gérer le formulaire
+  // react-hook-form
   const {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm();
 
-  const [loadError, setLoadError] = useState(null);
+  // Watch les valeurs pour gérer l'exclusivité groupe/responsable
+  const groupeId = watch('groupId');
+  const responsableId = watch('responsableId');
 
-  // Si on est en édition, on préremplit le formulaire à partir de l’événement dans context
+  // Chargement initial des données
   useEffect(() => {
-    if (!isEdit) return;
+    const fetchInitialData = async () => {
+      try {
+        setLoading(true);
+        
+        // Chargement en parallèle des données statiques
+        const [ressourcesRes, groupesRes, responsablesRes] = await Promise.all([
+          api.get('/api/resources'),
+          api.get('/api/groupes'),
+          api.get('/api/auth/all')
+        ]);
 
-    const evt = events.find((e) => String(e.id) === String(id));
-    if (!evt) {
-      setLoadError('Créneau introuvable.');
-      return;
-    }
+        setRessources(ressourcesRes.data);
+        setGroupes(groupesRes.data);
+        setResponsables(responsablesRes.data.filter(u => u.role === 'RESPONSABLE'));
+
+        // Si mode édition, charger aussi le créneau
+        if (isEdit) {
+          const creneauRes = await api.get(`/api/creneaux/${id}`);
+          setCreneau(creneauRes.data);
+        }
+
+        setLoading(false);
+      } catch (err) {
+        setError('Erreur lors du chargement des données');
+        setLoading(false);
+        console.error(err);
+      }
+    };
+
+    fetchInitialData();
+  }, [id, isEdit]);
+
+  // Pré-remplissage du formulaire quand les données sont chargées
+  useEffect(() => {
+    if (!isEdit || !creneau || loading) return;
+
+    // Préparer les valeurs pour les selects
+    const ressourceValue = ressources.find(r => r.id === creneau.ressourceId);
+    const groupeValue = groupes.find(g => g.id === creneau.groupId);
+    const responsableValue = responsables.find(r => r.id === creneau.responsableId);
+
     reset({
-      titre: evt.title,
-      description: evt.description || '',
-      groupe: evt.groupe || '',
-      ressourceId: evt.ressourceId,
-      dateDebut: evt.start.toISOString().slice(0, 16), // “YYYY-MM-DDThh:mm”
-      dateFin: evt.end.toISOString().slice(0, 16),
+      title: creneau.title,
+      description: creneau.description || '',
+      groupId: creneau.groupId || null,
+      responsableId: creneau.responsableId || null,
+      ressourceId: creneau.ressourceId,
+      start: creneau.start ? new Date(creneau.start).toISOString().slice(0, 16) : '',
+      end: creneau.end ? new Date(creneau.end).toISOString().slice(0, 16) : '',
     });
-  }, [id, isEdit, events, reset]);
+
+    // Mettre à jour les valeurs des selects
+    if (ressourceValue) {
+      setValue('ressourceId', ressourceValue.id);
+    }
+    if (groupeValue) {
+      setValue('groupId', groupeValue.id);
+    }
+    if (responsableValue) {
+      setValue('responsableId', responsableValue.id);
+    }
+  }, [creneau, isEdit, loading, reset, ressources, groupes, responsables, setValue]);
 
   const onSubmit = async (formValues) => {
-    // Construction de l’objet à passer au contexte
+    // Validation : doit avoir soit un groupe soit un responsable
+    if (!formValues.groupId && !formValues.responsableId) {
+      alert('Vous devez sélectionner soit un groupe soit un responsable');
+      return;
+    }
+
+    // Préparation des données
     const payload = {
-      title: formValues.titre,
+      title: formValues.title,
       description: formValues.description,
-      groupe: formValues.groupe,
       ressourceId: Number(formValues.ressourceId),
-      ressourceLabel:
-        ressources.find((r) => String(r.id) === String(formValues.ressourceId))?.libelle ||
-        '',
-      start: new Date(formValues.dateDebut),
-      end: new Date(formValues.dateFin),
+      groupId: formValues.groupId ? Number(formValues.groupId) : null,
+      responsableId: formValues.responsableId ? Number(formValues.responsableId) : null,
+      start: new Date(formValues.start),
+      end: new Date(formValues.end),
     };
 
     try {
       if (isEdit) {
-        updateEvent(Number(id), payload);
+        await api.put(`/api/creneaux/${id}`, payload);
       } else {
-        addEvent(payload);
+        await api.post('/api/creneaux', payload);
       }
       navigate('/dashboard/repartitions');
     } catch (error) {
       console.error('Erreur lors de la soumission :', error);
-      alert('Une erreur est survenue.');
+      alert('Une erreur est survenue : ' + (error.response?.data?.message || error.message));
     }
   };
 
-  if (loadError) {
+  // Préparer les options pour les selects
+  const ressourcesOptions = ressources.map(r => ({
+    value: r.id,
+    label: r.libelle,
+  }));
+
+  const groupesOptions = groupes.map(g => ({
+    value: g.id,
+    label: g.nom,
+  }));
+
+  const responsablesOptions = responsables.map(r => ({
+    value: r.id,
+    label: r.username,
+  }));
+
+  if (loading) {
+    return <div className="text-center py-8">Chargement en cours...</div>;
+  }
+
+  if (error) {
     return (
       <div className="bg-red-100 text-red-700 p-4 rounded">
-        {loadError}
+        {error}
+        <button 
+          onClick={() => window.location.reload()} 
+          className="ml-4 px-3 py-1 bg-red-600 text-white rounded"
+        >
+          Réessayer
+        </button>
       </div>
     );
   }
@@ -95,11 +176,11 @@ export default function RepartitionFormAzir() {
           </label>
           <input
             type="text"
-            {...register('titre', { required: 'Ce champ est obligatoire.' })}
+            {...register('title', { required: 'Ce champ est obligatoire.' })}
             className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
           />
-          {errors.titre && (
-            <p className="text-red-500 text-sm mt-1">{errors.titre.message}</p>
+          {errors.title && (
+            <p className="text-red-500 text-sm mt-1">{errors.title.message}</p>
           )}
         </div>
 
@@ -115,43 +196,72 @@ export default function RepartitionFormAzir() {
           />
         </div>
 
-        {/* Groupe */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Groupe / Responsable <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            placeholder="Nom du groupe ou du responsable"
-            {...register('groupe', { required: 'Renseignez le groupe.' })}
-            className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-          />
-          {errors.groupe && (
-            <p className="text-red-500 text-sm mt-1">{errors.groupe.message}</p>
-          )}
-        </div>
-
         {/* Ressource */}
         <div>
           <label className="block text-sm font-medium text-gray-700">
             Ressource <span className="text-red-500">*</span>
           </label>
-          <select
+          <Select
+            options={ressourcesOptions}
+            onChange={(selectedOption) => {
+              setValue('ressourceId', selectedOption.value);
+            }}
+            defaultValue={isEdit && creneau?.ressourceId ? 
+              { value: creneau.ressourceId, label: ressources.find(r => r.id === creneau.ressourceId)?.libelle } 
+              : null}
+            placeholder="Rechercher une ressource..."
+            isSearchable
+            required
+          />
+          <input
+            type="hidden"
             {...register('ressourceId', { required: 'Sélectionnez une ressource.' })}
-            className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            <option value="">-- Choisir la ressource --</option>
-            {ressources
-              .filter((r) => r.id !== 'Tous') // on n’affiche pas “Toutes les ressources” dans le formulaire
-              .map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.libelle} ({r.type || '—'})
-                </option>
-              ))}
-          </select>
+          />
           {errors.ressourceId && (
             <p className="text-red-500 text-sm mt-1">{errors.ressourceId.message}</p>
           )}
+        </div>
+
+        {/* Groupe */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Groupe (optionnel si responsable sélectionné)
+          </label>
+          <Select
+            options={groupesOptions}
+            onChange={(selectedOption) => {
+              setValue('groupId', selectedOption.value);
+              setValue('responsableId', null); // Désélectionner le responsable
+            }}
+            defaultValue={isEdit && creneau?.groupId ? 
+              { value: creneau.groupId, label: groupes.find(g => g.id === creneau.groupId)?.nom } 
+              : null}
+            placeholder="Sélectionner un groupe..."
+            isSearchable
+            isDisabled={!!responsableId}
+          />
+          <input type="hidden" {...register('groupId')} />
+        </div>
+
+        {/* Responsable */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Responsable (optionnel si groupe sélectionné)
+          </label>
+          <Select
+            options={responsablesOptions}
+            onChange={(selectedOption) => {
+              setValue('responsableId', selectedOption.value);
+              setValue('groupId', null); // Désélectionner le groupe
+            }}
+            defaultValue={isEdit && creneau?.responsableId ? 
+              { value: creneau.responsableId, label: responsables.find(r => r.id === creneau.responsableId)?.username } 
+              : null}
+            placeholder="Sélectionner un responsable..."
+            isSearchable
+            isDisabled={!!groupeId}
+          />
+          <input type="hidden" {...register('responsableId')} />
         </div>
 
         {/* Date et heure de début */}
@@ -161,13 +271,13 @@ export default function RepartitionFormAzir() {
           </label>
           <input
             type="datetime-local"
-            {...register('dateDebut', {
-              required: 'La date et l’heure de début sont requises.',
+            {...register('start', {
+              required: 'La date et l\'heure de début sont requises.',
             })}
             className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
           />
-          {errors.dateDebut && (
-            <p className="text-red-500 text-sm mt-1">{errors.dateDebut.message}</p>
+          {errors.start && (
+            <p className="text-red-500 text-sm mt-1">{errors.start.message}</p>
           )}
         </div>
 
@@ -178,13 +288,13 @@ export default function RepartitionFormAzir() {
           </label>
           <input
             type="datetime-local"
-            {...register('dateFin', {
-              required: 'La date et l’heure de fin sont requises.',
+            {...register('end', {
+              required: 'La date et l\'heure de fin sont requises.',
             })}
             className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
           />
-          {errors.dateFin && (
-            <p className="text-red-500 text-sm mt-1">{errors.dateFin.message}</p>
+          {errors.end && (
+            <p className="text-red-500 text-sm mt-1">{errors.end.message}</p>
           )}
         </div>
 

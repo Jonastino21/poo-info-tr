@@ -1,15 +1,17 @@
 import React, { useState, useContext } from 'react';
 import { AuthContext } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import LoginView from './LoginView';
+import RegisterView from './RegisterView';
 import { toast } from 'react-toastify';
 
-const LoginContainer = () => {
-  const { login } = useContext(AuthContext);
+const RegisterContainer = () => {
+  const { register } = useContext(AuthContext);
   const navigate = useNavigate();
 
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -19,11 +21,11 @@ const LoginContainer = () => {
     setError(null);
 
     try {
-      await login({ email, password });
+      await register({ username, email, password, role });
       
-      toast.success('Connexion réussie !', {
+      toast.success('Inscription réussie ! Vous pouvez maintenant vous connecter', {
         position: 'top-right',
-        autoClose: 2000,
+        autoClose: 3000,
         hideProgressBar: false,
         closeOnClick: true,
         pauseOnHover: true,
@@ -31,13 +33,7 @@ const LoginContainer = () => {
         progress: undefined,
       });
 
-      // Redirection en fonction du rôle
-      const user = JSON.parse(localStorage.getItem('AUTH_USER'));
-      if (user?.role === 'RESPONSABLE') {
-        navigate('/dashboard/responsable');
-      } else {
-        navigate('/dashboard/student');
-      }
+      navigate('/login');
     } catch (err) {
       setError(err.message);
     }
@@ -46,11 +42,15 @@ const LoginContainer = () => {
   };
 
   return (
-    <LoginView
+    <RegisterView
+      username={username}
+      setUsername={setUsername}
       email={email}
       setEmail={setEmail}
       password={password}
       setPassword={setPassword}
+      role={role}
+      setRole={setRole}
       error={error}
       loading={loading}
       onSubmit={handleSubmit}
@@ -58,4 +58,4 @@ const LoginContainer = () => {
   );
 };
 
-export default LoginContainer;
+export default RegisterContainer;

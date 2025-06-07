@@ -3,7 +3,7 @@ import { Outlet, Link } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 import Navbar from '../components/layouts/navbar';
 
-import { HomeIcon, BookOpenIcon } from '@heroicons/react/24/outline'
+import { HomeIcon, BookOpenIcon, UserGroupIcon, ArrowLeftCircleIcon, WrenchIcon } from '@heroicons/react/24/outline'
 
 const Dashboard = () => {
   const { user, logout } = useContext(AuthContext);
@@ -41,6 +41,26 @@ const Dashboard = () => {
                   <BookOpenIcon className="h-5 w-5 text-gray-500" />
                   
                    <span className="ml-3 font-medium">Gestion  des répartitions et utilisations</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/dashboard/ressources"
+                  className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md"
+                >
+                  <WrenchIcon className="h-5 w-5 text-gray-500" />
+                  
+                   <span className="ml-3 font-medium">Réssources</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/dashboard/groupes"
+                  className="flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md"
+                >
+                  <UserGroupIcon className="h-5 w-5 text-gray-500" />
+                  
+                   <span className="ml-3 font-medium">Groupes</span>
                 </Link>
               </li>
               {/* … autres liens éventuels … */}

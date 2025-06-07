@@ -4,10 +4,10 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
 
 const ProtectedRoute = () => {
-  const { token } = useContext(AuthContext);
+  const { user,isAuthenticated } = useContext(AuthContext);
 
   // Si pas de token → redirection vers /login
-  if (!token) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
