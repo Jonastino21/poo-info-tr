@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import Select from 'react-select';
 import { api } from '../../../config';
+import { useEvents } from '../../contexts/EventsContext';
 
 export default function RepartitionFormAzir() {
   const { id } = useParams();
@@ -17,6 +18,7 @@ export default function RepartitionFormAzir() {
   const [creneau, setCreneau] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const {addEvent,updateEvent} = useEvents();
 
   // react-hook-form
   const {
@@ -103,7 +105,7 @@ export default function RepartitionFormAzir() {
       alert('Vous devez sélectionner soit un groupe soit un responsable');
       return;
     }
-
+    try {
     // Préparation des données
     const payload = {
       title: formValues.title,
@@ -115,17 +117,20 @@ export default function RepartitionFormAzir() {
       end: new Date(formValues.end),
     };
 
-    try {
-      if (isEdit) {
-        await api.put(`/api/creneaux/${id}`, payload);
-      } else {
-        await api.post('/api/creneaux', payload);
-      }
-      navigate('/dashboard/repartitions');
-    } catch (error) {
-      console.error('Erreur lors de la soumission :', error);
-      alert('Une erreur est survenue : ' + (error.response?.data?.message || error.message));
+    console.log(payload);
+
+    if (isEdit) {
+      await updateEvent(id, payload);
+    } else {
+      await addEvent(payload);
     }
+    
+    // Navigation après succès
+    navigate('/dashboard/repartitions');
+  } catch (error) {
+    console.error('Erreur:', error);
+    alert('Erreur: ' + (error.response?.data?.message || error.message));
+  }
   };
 
   // Préparer les options pour les selects

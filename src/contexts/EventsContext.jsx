@@ -15,88 +15,83 @@ export function EventsProvider({ children }) {
   const [responsables, setResponsables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Fonction pour convertir les dates du format API en objets Date
-  const parseEventDates = (event) => ({
-    ...event,
-    start: new Date(event.start),
-    end: new Date(event.end)
-  });
+  // Fonction pour convertir et enrichir les événements
+  const processEvents = (eventsData) => {
+    return eventsData.map(event => ({
+      ...event,
+      start: new Date(event.start),
+      end: new Date(event.end),
+      ressourceLabel: event.ressourceLabel || 'Inconnue',
+      groupe: event.groupe || null,
+      responsable: event.responsable || null
+    }));
+  };
 
-  // Chargement des données initiales depuis l'API
+  // Chargement des données initiales
+  const fetchAllData = async () => {
+    try {
+      setLoading(true);
+      
+      const [ressourcesRes, groupesRes, responsablesRes, creneauxRes] = await Promise.all([
+        api.get('/api/resources'),
+        api.get('/api/groupes'),
+        api.get('/api/auth/all'),
+        api.get('/api/creneaux'),
+      ]);
+
+      setRessources(ressourcesRes.data);
+      setGroupes(groupesRes.data);
+      setResponsables(responsablesRes.data.filter(u => u.role === 'RESPONSABLE'));
+      setEvents(processEvents(creneauxRes.data));
+      
+      setLoading(false);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+      console.error('Erreur lors du chargement des données:', err);
+    }
+  };
+
+  // Rafraîchissement forcé
+  const refreshData = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
   useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        setLoading(true);
-        
-        const [ressourcesRes, groupesRes, responsablesRes, creneauRes] = await Promise.all([
-          api.get('/api/resources'),
-          api.get('/api/groupes'),
-          api.get('/api/auth/all'),
-          api.get('/api/creneaux'),
-        ]);
+    fetchAllData();
+  }, [refreshTrigger]);
 
-        setRessources(ressourcesRes.data);
-        setGroupes(groupesRes.data);
-        // Conversion des dates pour les événements
-        setEvents(creneauRes.data.map(parseEventDates));
-        setResponsables(responsablesRes.data.filter(u => u.role === 'RESPONSABLE'));
-        
-        setLoading(false);
-      } catch (err) {
-        setError(err.message);
-        setLoading(false);
-        console.error('Erreur lors du chargement des données:', err);
-      }
-    };
-
-    fetchInitialData();
-  }, []);
-
-  // Ajouter un créneau
+  // Opérations CRUD
   const addEvent = async (newEvent) => {
     try {
       const response = await api.post('/api/creneaux', newEvent);
-      const eventWithDates = parseEventDates(response.data);
-      setEvents(prev => [...prev, eventWithDates]);
-      return eventWithDates;
+      refreshData(); // Rafraîchir après ajout
+      return response.data;
     } catch (err) {
-      console.error('Erreur lors de l\'ajout du créneau:', err);
+      console.error('Erreur lors de l\'ajout:', err);
       throw err;
     }
   };
 
-  // Mettre à jour un créneau
   const updateEvent = async (id, updatedEvent) => {
     try {
       const response = await api.put(`/api/creneaux/${id}`, updatedEvent);
-      const eventWithDates = parseEventDates(response.data);
-      setEvents(prev => prev.map(evt => evt.id === id ? eventWithDates : evt));
-      return eventWithDates;
+      refreshData(); // Rafraîchir après mise à jour
+      return response.data;
     } catch (err) {
-      console.error('Erreur lors de la mise à jour du créneau:', err);
+      console.error('Erreur lors de la mise à jour:', err);
       throw err;
     }
   };
 
-  // Supprimer un créneau
   const deleteEvent = async (id) => {
     try {
       await api.delete(`/api/creneaux/${id}`);
-      setEvents(prev => prev.filter(evt => evt.id !== id));
+      refreshData(); // Rafraîchir après suppression
     } catch (err) {
-      console.error('Erreur lors de la suppression du créneau:', err);
-      throw err;
-    }
-  };
-
-  // Charger tous les créneaux
-  const loadEvents = async () => {
-    try {
-      const response = await api.get('/api/creneaux');
-      setEvents(response.data.map(parseEventDates));
-    } catch (err) {
-      console.error('Erreur lors du chargement des créneaux:', err);
+      console.error('Erreur lors de la suppression:', err);
       throw err;
     }
   };
@@ -111,7 +106,7 @@ export function EventsProvider({ children }) {
     addEvent,
     updateEvent,
     deleteEvent,
-    loadEvents,
+    refreshData
   };
 
   return (

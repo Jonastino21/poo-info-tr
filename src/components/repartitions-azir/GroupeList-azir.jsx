@@ -64,7 +64,7 @@ const GroupsList = () => {
       } else {
         await api.post('/api/groupes', {
           nom: formData.nom,
-          studensIds: formData.membres.map(m => m.id) // Envoyer seulement les IDs pour la création
+          studentIds: formData.membres.map(m => m.id) // Envoyer seulement les IDs pour la création
         });
       }
       fetchGroups();
